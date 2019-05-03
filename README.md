@@ -1,5 +1,4 @@
-# Bitmap-Project
-My first Project on GitHub
+Changelog:
 
 03/05 (Friday):
 - Thêm mảng hai chiều Pixels2D và Pixels2D_HSV cho struct Bitmap.
