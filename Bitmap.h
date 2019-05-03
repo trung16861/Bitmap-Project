@@ -29,9 +29,14 @@ struct Bitmap
 	vector<vector<ColorHSV>> Pixels2D_HSV;
 };
 
+// Functions in Bitmap.cpp
+
 int LoadBitmap(const char *fname, Bitmap &bmp);
 int SaveBitmap(const char *fname, const Bitmap &bmp);
 void DisposeBitmap(Bitmap &bmp);
+
+bool SetPixel(const Bitmap &bmp, int row, int col, Color color);
+bool GetPixel(const Bitmap &bmp, int row, int col, Color &color);
 
 void pixels_to_Pixels2D(Bitmap &bmp);
 void Pixels2D_to_pixels(Bitmap &bmp);
@@ -39,10 +44,11 @@ void Pixels2D_to_pixels(Bitmap &bmp);
 void BGR2HSV(Bitmap &bmp);
 void HSV2BGR(Bitmap &bmp);
 
-int SetPixel(const Bitmap &bmp, int row, int col, Color color);
-int GetPixel(const Bitmap &bmp, int row, int col, Color &color);
+// Functions in Effect.cpp
 
-void AdjustBrightness(const Bitmap &bmp, double factor);
+void AdjustBrightness(const Bitmap &bmp, double factor, double bright);
 void Enlarge(const Bitmap &inbmp, Bitmap &outbmp);
+void BGR2Gray(Bitmap &bitmap);
+void BGR2Binary(Bitmap &bitmap);
 
 #endif
