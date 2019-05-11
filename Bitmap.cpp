@@ -20,49 +20,42 @@ struct DIBHeader
 	unsigned char reserved[24];
 };
 
-int LoadBitmap(const char *fname, Bitmap &bmp)
+Bitmap LoadBitmap(string fname)
 {
-	FILE *f = fopen(fname, "rb");
-	if (f == NULL)
-		return 0;
-
+	FILE *f = fopen(fname.c_str(), "rb");
+	
 	// read BMFHeader
 	BMFHeader bmfhd;
-	if(fread(&bmfhd, sizeof(BMFHeader), 1, f) == 0)
-		return 0;
-
-	if(bmfhd.signature[0] != 'B' || bmfhd.signature[1] != 'M')
-		return 0;
+	fread(&bmfhd, sizeof(BMFHeader), 1, f);
 
 	// read DIBHeader
 	DIBHeader dibhd;
-	if(fread(&dibhd, sizeof(DIBHeader), 1, f) == 0)
-		return 0;
-
-	if(dibhd.colorDepth != 24 || dibhd.height < 0)
-		return 0;
+	fread(&dibhd, sizeof(DIBHeader), 1, f);
 
 	// read pixels (24 bits = 3 bytes/pixel)
+	Bitmap bmp;
+
 	bmp.width = dibhd.width;
 	bmp.height = dibhd.height;
-	bmp.rowSize = ((3 * bmp.width + 3)/4)*4;
-
-	bmp.pixels = new unsigned char[bmp.height * bmp.rowSize];
-	if(bmp.pixels == NULL)
-		return 0;
-
+	bmp.rowSize = ((3 * bmp.width + 3) / 4) * 4;
+	
 	fseek(f, bmfhd.pixelAddress, SEEK_SET);
-	if(fread(bmp.pixels, bmp.rowSize, bmp.height, f) < bmp.height)
-		return 0;
-
+	
+	if (bmp.pixels.empty())
+		bmp.pixels.resize(bmp.height * bmp.rowSize);
+	
+	fread(&bmp.pixels[0], bmp.rowSize, bmp.height, f);
 	fclose(f);
 
-	return 1;
+	pixels_to_Pixels2D(bmp);
+	BGR2HSV(bmp);
+
+	return bmp;
 }
 
-int SaveBitmap(const char *fname, const Bitmap &bmp)
+int SaveBitmap(string fname, Bitmap &bmp)
 {
-	FILE *f = fopen(fname, "wb");
+	FILE *f = fopen(fname.c_str(), "wb");
 	if (f == NULL)
 		return 0;
 
@@ -88,7 +81,10 @@ int SaveBitmap(const char *fname, const Bitmap &bmp)
 		return 0;
 
 	// write pixels
-	if (fwrite(bmp.pixels, bmp.height, bmp.rowSize, f) < bmp.height)
+	if (bmp.pixels.empty())
+		Pixels2D_to_pixels(bmp);
+
+	if (fwrite(&bmp.pixels[0], bmp.height, bmp.rowSize, f) < bmp.height)
 		return 0;
 
 	fclose(f);
@@ -96,17 +92,10 @@ int SaveBitmap(const char *fname, const Bitmap &bmp)
 	return 1;
 }
 
-void DisposeBitmap(Bitmap &bmp)
-{
-	if (bmp.pixels != NULL)
-	{
-		delete[] bmp.pixels;
-		bmp.pixels = NULL;
-	}
-}
+
 
 // O(1)
-bool SetPixel(const Bitmap &bmp, int row, int col, Color color)
+bool SetPixel(Bitmap &bmp, int row, int col, Color color)
 {
 	if (row < 0 || row >= bmp.height
 		|| col < 0 || col >= bmp.width)
@@ -138,110 +127,254 @@ bool GetPixel(const Bitmap &bmp, int row, int col, Color &color)
 
 void pixels_to_Pixels2D(Bitmap &bmp)
 {
-    bmp.Pixels2D.resize(bmp.height);
-    for (int row = 0; row < bmp.height; row++)
-    {
-        bmp.Pixels2D[row].resize(bmp.width);
-        for (int col = 0; col < bmp.width; col++)
-            GetPixel(bmp, row, col, bmp.Pixels2D[row][col]);
-    }
+    if (bmp.Pixels2D.empty())
+	{
+		bmp.Pixels2D.resize(bmp.height);
+		for (int row = 0; row < bmp.height; row++)
+		{
+			bmp.Pixels2D[row].resize(bmp.width);
+			for (int col = 0; col < bmp.width; col++)
+				GetPixel(bmp, row, col, bmp.Pixels2D[row][col]);
+		}
+	}
+	else
+		for (int row = 0; row < bmp.height; row++)
+			for (int col = 0; col < bmp.width; col++)
+				GetPixel(bmp, row, col, bmp.Pixels2D[row][col]);
+		
 }
 
 void Pixels2D_to_pixels(Bitmap &bmp)
 {
-    for (int row = 0; row < bmp.height; row++)
+	if (bmp.Pixels2D.empty())
+		HSV2BGR(bmp);
+		
+    if (bmp.pixels.empty())
+		bmp.pixels.resize(bmp.height * bmp.rowSize);
+
+	for (int row = 0; row < bmp.height; row++)
 		for (int col = 0; col < bmp.width; col++)
 			SetPixel(bmp, row, col, bmp.Pixels2D[row][col]);
 }
 
 void BGR2HSV(Bitmap &bmp)
 {
-    bmp.Pixels2D_HSV.resize(bmp.height);
-    for (int row = 0; row < bmp.height; row++)
-    {
-        bmp.Pixels2D_HSV[row].resize(bmp.width);
-        for (int col = 0; col < bmp.width; col++)
-        {
-			unsigned char R = bmp.Pixels2D[row][col].R;
-			unsigned char G = bmp.Pixels2D[row][col].G;
-			unsigned char B = bmp.Pixels2D[row][col].B;
+   if (bmp.Pixels2D.empty())
+		pixels_to_Pixels2D(bmp);
 
-            double H, S, V;
-
-            V = max(R, max(G, B));		
-            double m = min(R, min(G, B));		
-
-            if (V == 0)		// R = G = B = 0
-                S = 0;
-            else
-                S = (V - m) / V;		
-
-            if (S == 0)		// R = G = B
-                H = 0;
-			else if (V == R)
+	if (bmp.Pixels2D_HSV.empty())
+	{
+		bmp.Pixels2D_HSV.resize(bmp.height);
+		for (int row = 0; row < bmp.height; row++)
+		{
+			bmp.Pixels2D_HSV[row].resize(bmp.width);
+			for (int col = 0; col < bmp.width; col++)
 			{
-				H = 60 * (G - B) / (V - m);			// -60 <= H <= 60
-				if (H < 0)
-					H += 360;						// H thuoc [0, 60] U [300, 360)
-			}
-            else if (V == G)
-                H = 120 + 60 * (B - R) / (V - m);	// 60 <= H <= 180
-            else
-                H = 240 + 60 * (R - G) / (V - m);	// 180 <= H <= 300
+				unsigned char R = bmp.Pixels2D[row][col].R;
+				unsigned char G = bmp.Pixels2D[row][col].G;
+				unsigned char B = bmp.Pixels2D[row][col].B;
 
-            bmp.Pixels2D_HSV[row][col].H = H;
-			bmp.Pixels2D_HSV[row][col].S = S;
-			bmp.Pixels2D_HSV[row][col].V = 0;//V / 255;
-        }
-    }
+				double H, S, V;
+
+				V = max(R, max(G, B));
+				double m = min(R, min(G, B));
+
+				if (V == 0)		// R = G = B = 0
+					S = 0;
+				else
+					S = (V - m) / V;
+
+				if (S == 0)		// R = G = B
+					H = 0;
+				else if (V == R)
+				{
+					H = 60 * (G - B) / (V - m);			// -60 <= H <= 60
+					if (H < 0)
+						H += 360;						// H thuoc [0, 60] U [300, 360)
+				}
+				else if (V == G)
+					H = 120 + 60 * (B - R) / (V - m);	// 60 <= H <= 180
+				else
+					H = 240 + 60 * (R - G) / (V - m);	// 180 <= H <= 300
+
+				bmp.Pixels2D_HSV[row][col].H = H;
+				bmp.Pixels2D_HSV[row][col].S = S;
+				bmp.Pixels2D_HSV[row][col].V = V / 255;
+			}
+		}
+	}
+	else
+		for (int row = 0; row < bmp.height; row++)
+			for (int col = 0; col < bmp.width; col++)
+			{
+				unsigned char R = bmp.Pixels2D[row][col].R;
+				unsigned char G = bmp.Pixels2D[row][col].G;
+				unsigned char B = bmp.Pixels2D[row][col].B;
+
+				double H, S, V;
+
+				V = max(R, max(G, B));
+				double m = min(R, min(G, B));
+
+				if (V == 0)		// R = G = B = 0
+					S = 0;
+				else
+					S = (V - m) / V;
+
+				if (S == 0)		// R = G = B
+					H = 0;
+				else if (V == R)
+				{
+					H = 60 * (G - B) / (V - m);			// -60 <= H <= 60
+					if (H < 0)
+						H += 360;						// H thuoc [0, 60] U [300, 360)
+				}
+				else if (V == G)
+					H = 120 + 60 * (B - R) / (V - m);	// 60 <= H <= 180
+				else
+					H = 240 + 60 * (R - G) / (V - m);	// 180 <= H <= 300
+
+				bmp.Pixels2D_HSV[row][col].H = H;
+				bmp.Pixels2D_HSV[row][col].S = S;
+				bmp.Pixels2D_HSV[row][col].V = V / 255;
+			}
 }
 
 void HSV2BGR(Bitmap &bmp)
 {
-    for (int row = 0; row < bmp.height; row++)
-        for (int col = 0; col < bmp.width; col++)
-    {
-        double H = bmp.Pixels2D_HSV[row][col].H;
-        double S = bmp.Pixels2D_HSV[row][col].S;
-		double V = bmp.Pixels2D_HSV[row][col].V;
+    if (bmp.Pixels2D.empty())
+	{
+		bmp.Pixels2D.resize(bmp.height);
+		for (int row = 0; row < bmp.height; row++)
+		{
+			bmp.Pixels2D[row].resize(bmp.width);
+			for (int col = 0; col < bmp.width; col++)
+			{
+				double H = bmp.Pixels2D_HSV[row][col].H;
+				double S = bmp.Pixels2D_HSV[row][col].S;
+				double V = bmp.Pixels2D_HSV[row][col].V;
 
-        double B1, G1, R1;
-        B1 = G1 = R1 = 0;
+				double B1, G1, R1;
+				B1 = G1 = R1 = 0;
 
-        double C = V*S;			// C = max - min
+				double C = V*S;			// C = max - min
 
-        double X = C*(1 - abs(fmod(H/60, 2) - 1));
+				double X = C*(1 - abs(fmod(H / 60, 2) - 1));
 
-        double m = V - C;		// m = min
+				double m = V - C;		// m = min
 
-        if (H < 60)
-        {
-            R1 = C; G1 = X;
-        }
-        else if (H < 120)
-        {
-            R1 = X; G1 = C;
-        }
-        else if (H < 180)
-        {
-            G1 = C; B1 = X;
-        }
-        else if (H < 240)
-        {
-            G1 = X; B1 = C;
-        }
-        else if (H < 300)
-        {
-            R1 = X; B1 = C;
-        }
-        else
-        {
-            R1 = C; B1 = X;
-        }
+				if (H < 60)
+				{
+					R1 = C; G1 = X;
+				}
+				else if (H < 120)
+				{
+					R1 = X; G1 = C;
+				}
+				else if (H < 180)
+				{
+					G1 = C; B1 = X;
+				}
+				else if (H < 240)
+				{
+					G1 = X; B1 = C;
+				}
+				else if (H < 300)
+				{
+					R1 = X; B1 = C;
+				}
+				else
+				{
+					R1 = C; B1 = X;
+				}
 
-		bmp.Pixels2D[row][col].R = (R1 + m) * 255;
-		bmp.Pixels2D[row][col].G = (G1 + m) * 255;
-		bmp.Pixels2D[row][col].B = (B1 + m) * 255;	
-    }
+				bmp.Pixels2D[row][col].R = (R1 + m) * 255;
+				bmp.Pixels2D[row][col].G = (G1 + m) * 255;
+				bmp.Pixels2D[row][col].B = (B1 + m) * 255;
+			}
+		}
+	}
+	else
+		for (int row = 0; row < bmp.height; row++)
+			for (int col = 0; col < bmp.width; col++)
+			{
+				double H = bmp.Pixels2D_HSV[row][col].H;
+				double S = bmp.Pixels2D_HSV[row][col].S;
+				double V = bmp.Pixels2D_HSV[row][col].V;
+
+				double B1, G1, R1;
+				B1 = G1 = R1 = 0;
+
+				double C = V*S;			// C = max - min
+
+				double X = C*(1 - abs(fmod(H / 60, 2) - 1));
+
+				double m = V - C;		// m = min
+
+				if (H < 60)
+				{
+					R1 = C; G1 = X;
+				}
+				else if (H < 120)
+				{
+					R1 = X; G1 = C;
+				}
+				else if (H < 180)
+				{
+					G1 = C; B1 = X;
+				}
+				else if (H < 240)
+				{
+					G1 = X; B1 = C;
+				}
+				else if (H < 300)
+				{
+					R1 = X; B1 = C;
+				}
+				else
+				{
+					R1 = C; B1 = X;
+				}
+
+				bmp.Pixels2D[row][col].R = (R1 + m) * 255;
+				bmp.Pixels2D[row][col].G = (G1 + m) * 255;
+				bmp.Pixels2D[row][col].B = (B1 + m) * 255;
+			}
 }
 
+void copyPixels2D(Bitmap &bmp, Bitmap &new_bmp)
+{
+	if (bmp.Pixels2D.empty())
+		pixels_to_Pixels2D(bmp);
+
+	new_bmp.Pixels2D.resize(bmp.height);
+	for (int row = 0; row < bmp.height; row++)
+	{
+		new_bmp.Pixels2D[row].resize(bmp.width);
+		for (int col = 0; col < bmp.width; col++)
+			{
+				new_bmp.Pixels2D[row][col].B = bmp.Pixels2D[row][col].B;
+				new_bmp.Pixels2D[row][col].G = bmp.Pixels2D[row][col].G;
+				new_bmp.Pixels2D[row][col].R = bmp.Pixels2D[row][col].R;
+			}
+	}
+}
+
+void copyPixels2D_HSV(Bitmap &bmp, Bitmap &new_bmp)
+{
+	if (bmp.Pixels2D_HSV.empty())
+		BGR2HSV(bmp);
+
+	new_bmp.Pixels2D_HSV.resize(bmp.height);
+	for (int row = 0; row < bmp.height; row++)
+	{
+		new_bmp.Pixels2D_HSV[row].resize(bmp.width);
+		for (int col = 0; col < bmp.width; col++)
+		{
+			new_bmp.Pixels2D_HSV[row][col].H = bmp.Pixels2D_HSV[row][col].H;
+			new_bmp.Pixels2D_HSV[row][col].S = bmp.Pixels2D_HSV[row][col].S;
+			new_bmp.Pixels2D_HSV[row][col].V = bmp.Pixels2D_HSV[row][col].V;
+		}
+	}
+		
+}

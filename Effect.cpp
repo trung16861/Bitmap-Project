@@ -4,21 +4,21 @@ void Enlarge(const Bitmap &inbmp, Bitmap &outbmp)
 {
 	outbmp.width = 2 * inbmp.width;
 	outbmp.height = 2 * inbmp.height;
-	outbmp.rowSize = ((3 * outbmp.width + 3)/4)*4;
-	outbmp.pixels = new unsigned char[outbmp.rowSize * outbmp.height];
-	for(int row = 0; row < inbmp.height; row++)
-		for(int col = 0; col < inbmp.width; col++)
+	outbmp.rowSize = ((3 * outbmp.width + 3) / 4) * 4;
+	outbmp.pixels.resize(outbmp.rowSize * outbmp.height);
+	for (int row = 0; row < inbmp.height; row++)
+		for (int col = 0; col < inbmp.width; col++)
 		{
 			Color color;
 			GetPixel(inbmp, row, col, color);
-			SetPixel(outbmp, 2*row, 2*col, color);
-			SetPixel(outbmp, 2*row, 2*col + 1, color);
-			SetPixel(outbmp, 2*row + 1, 2*col, color);
-			SetPixel(outbmp, 2*row + 1, 2*col + 1, color);
+			SetPixel(outbmp, 2 * row, 2 * col, color);
+			SetPixel(outbmp, 2 * row, 2 * col + 1, color);
+			SetPixel(outbmp, 2 * row + 1, 2 * col, color);
+			SetPixel(outbmp, 2 * row + 1, 2 * col + 1, color);
 		}
 }
 
-void AdjustBrightness(const Bitmap &bmp, double factor, double bright)
+void AdjustBrightness(Bitmap &bmp, double factor, double bright)
 {
 	//bright: độ sáng
 	for (int row = 0; row < bmp.height; row++)
@@ -47,7 +47,26 @@ void AdjustBrightness(const Bitmap &bmp, double factor, double bright)
 }
 
 //void AdjustSaturation(const Bitmap &bmp, double factor)
+Bitmap AdjustSaturation(Bitmap &bmp, double S_val)
+{
+	Bitmap new_bmp;
+	new_bmp.height = bmp.height;
+	new_bmp.width = bmp.width;
+	new_bmp.rowSize = bmp.rowSize;
 
+	if (bmp.Pixels2D_HSV.empty())
+		BGR2HSV(bmp);
+	copyPixels2D_HSV(bmp, new_bmp);
+
+	for (int row = 0; row < new_bmp.height; row++)
+		for (int col = 0; col < new_bmp.width; col++)
+			new_bmp.Pixels2D_HSV[row][col].S = S_val;
+
+	HSV2BGR(new_bmp);
+	Pixels2D_to_pixels(new_bmp);
+
+	return new_bmp;
+}
 
 void BGR2Gray(Bitmap &bitmap)
 {
@@ -59,11 +78,8 @@ void BGR2Gray(Bitmap &bitmap)
 			GetPixel(bitmap, row, col, color);
 			//cường độ sáng tại điểm ảnh (row, col)
 			int I = 0.114 * color.B + 0.587 * color.G + 0.299 * color.R;
-			color.B = I;
-			color.G = I;
-			color.R = I;
+			color.B = color.G = color.R = I;
 			SetPixel(bitmap, row, col, color);
-
 		}
 	}
 }
@@ -95,9 +111,7 @@ void BGR2Binary(Bitmap &bitmap)
 			if (color.R > T)
 				bin = 255;
 
-			color.B = bin;
-			color.G = bin;
-			color.R = bin;
+			color.B = color.G = color.R = bin;
 			SetPixel(bitmap, row, col, color);
 		}
 }

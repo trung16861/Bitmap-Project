@@ -2,34 +2,17 @@
 
 int main()
 {
-	const char *inFileName = "MARBLES.BMP";
-	const char *outFileName= "out1.bmp";
-	Bitmap bmp;
+	string inFileName("MARBLES.BMP");
+	string outFileName("out.bmp");
+	Bitmap bmp = LoadBitmap(inFileName);
 
-	if(LoadBitmap(inFileName, bmp))
-	{
-		printf("%dx%d\n", bmp.width, bmp.height);
+	
+	printf("%dx%d\n", bmp.width, bmp.height);
 
-		/*pixels_to_Pixels2D(bmp);
+	Bitmap new_bmp = AdjustSaturation(bmp, 0.3);
 
-		BGR2HSV(bmp);
-		HSV2BGR(bmp);
-
-		Pixels2D_to_pixels(bmp);*/
-		//AdjustBrightness(bmp, 2.0);
-		BGR2Binary(bmp);
-
-		if(SaveBitmap(outFileName, bmp))
-		{
-		}
-		else
-			printf("Can not save the bitmap file!!!\n");
-
-		DisposeBitmap(bmp);
-	}
-	else
-		printf("Can not load the bitmap file!!!\n");
-
+	SaveBitmap(outFileName, new_bmp);
+		
 	printf("Bye!\n");
 
 	return 0;
