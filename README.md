@@ -36,24 +36,17 @@ Changelog:
     Bitmap Name_of_function(Bitmap &bmp, args...)
     {
         Bitmap new_bmp;
-        
         // Nếu chỉ cần dùng mảng Pixels2D thôi thì:
         copyPixels2D(bmp, new_bmp);
-
         // Nếu chỉ cần dùng mảng Pixels2D_HSV thôi thì:
         copyPixels2D_HSV(bmp, new_bmp);
-
-        
         //---------------------------------//
         //-------Chỉnh sửa ở đây-----------//
         //---------------------------------//
-
         Pixels2D_to_pixels(new_bmp); // trong này đã có bước HSV2BGR rồi
-
         // tính lại height, width, rowSize, nếu ko đổi thì vẫn gán giá trị vào
         new_bmp.height = bmp.height;
         new_bmp.width = bmp.width;
         new_bmp.rowSize = bmp.rowSize;
-
         return new_bmp;
     }
